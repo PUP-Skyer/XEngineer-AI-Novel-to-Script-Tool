@@ -1,0 +1,201 @@
+// ===========================
+// 全局样式 - 暗色主题覆盖
+// ===========================
+
+// 重置
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif;
+  font-size: 14px;
+  color: #ffffff;
+  background-color: #131420;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+  }
+}
+
+// ===========================
+// Element Plus 暗色主题覆盖
+// ===========================
+
+// 卡片
+.el-card {
+  --el-card-bg-color: #1e2030;
+  border-color: rgba(255, 255, 255, 0.08);
+
+  .el-card__header {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+
+// 表格
+.el-table {
+  --el-table-bg-color: #1e2030;
+  --el-table-tr-bg-color: #1e2030;
+  --el-table-header-bg-color: #252740;
+  --el-table-row-hover-bg-color: #252740;
+  --el-table-border-color: rgba(255, 255, 255, 0.08);
+  --el-table-text-color: rgba(255, 255, 255, 0.65);
+  --el-table-header-text-color: rgba(255, 255, 255, 0.85);
+
+  .el-table__cell {
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+  }
+}
+
+// 输入框
+.el-input__wrapper {
+  background-color: #2a2c3e;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+}
+
+// 对话框
+.el-dialog {
+  --el-dialog-bg-color: #1e2030;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+
+  .el-dialog__title {
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+
+// 面包屑
+.el-breadcrumb {
+  .el-breadcrumb__inner {
+    color: rgba(255, 255, 255, 0.45);
+
+    &.is-link:hover {
+      color: #409eff;
+    }
+  }
+
+  .el-breadcrumb__item:last-child .el-breadcrumb__inner {
+    color: rgba(255, 255, 255, 0.65);
+  }
+}
+
+// 分页器
+.el-pagination {
+  --el-pagination-bg-color: #252740;
+  --el-pagination-text-color: rgba(255, 255, 255, 0.65);
+  --el-pagination-button-color: rgba(255, 255, 255, 0.65);
+  --el-pagination-hover-color: #409eff;
+}
+
+// 标签
+.el-tag {
+  border-radius: 4px;
+}
+
+// 下拉菜单
+.el-dropdown-menu {
+  background-color: #1e2030;
+  border-color: rgba(255, 255, 255, 0.08);
+
+  .el-dropdown-menu__item {
+    color: rgba(255, 255, 255, 0.65);
+
+    &:hover {
+      background-color: #252740;
+      color: #409eff;
+    }
+  }
+}
+
+// 表单
+.el-form-item__label {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+// 选择器
+.el-select-dropdown {
+  background-color: #1e2030;
+  border-color: rgba(255, 255, 255, 0.08);
+
+  .el-select-dropdown__item {
+    color: rgba(255, 255, 255, 0.65);
+
+    &.hover,
+    &:hover {
+      background-color: #252740;
+    }
+
+    &.selected {
+      color: #409eff;
+    }
+  }
+}
+
+// ===========================
+// 通用工具类
+// ===========================
+
+.page-container {
+  padding: 0;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+
+  .page-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+
+.card-container {
+  background-color: #1e2030;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

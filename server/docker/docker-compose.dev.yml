@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 开发环境服务
+  # ==========================================
+
+  # NestJS 后端服务
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: builder
+    container_name: asg-api-dev
+    ports:
+      - '3000:3000'
+    volumes:
+      - ../src:/app/src
+      - ../nest-cli.json:/app/nest-cli.json
+      - ../tsconfig.json:/app/tsconfig.json
+      - ../tsconfig.build.json:/app/tsconfig.build.json
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=root
+      - DB_PASSWORD=rootpassword
+      - DB_DATABASE=asg_dev
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=dev-jwt-secret-change-me
+      - AI_DEFAULT_PROVIDER=openai
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    command: npm run dev
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - asg-network
+
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: asg-mysql-dev
+    ports:
+      - '3306:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: asg_dev
+      MYSQL_USER: asg
+      MYSQL_PASSWORD: asg_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-prootpassword']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - asg-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: asg-redis-dev
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asg-network
+
+  # Redis 管理界面
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: asg-redis-commander-dev
+    ports:
+      - '8081:8081'
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - asg-network
+
+  # phpMyAdmin (可选)
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: asg-phpmyadmin-dev
+    ports:
+      - '8082:80'
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: rootpassword
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - asg-network
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  asg-network:
+    driver: bridge

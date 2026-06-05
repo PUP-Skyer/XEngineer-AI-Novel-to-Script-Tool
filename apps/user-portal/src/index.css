@@ -1,0 +1,73 @@
+@import '@asg/ui-theme/src/components/neon-glow.css';
+@import '@asg/ui-theme/src/components/animations.css';
+@import '@asg/ui-theme/src/components/card-styles.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #0a0a0f;
+  color: #e8e8f0;
+  font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #12121a;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a45;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a55;
+}
+
+::selection {
+  background: rgba(168, 85, 247, 0.3);
+  color: #e8e8f0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+@layer components {
+  .neon-border {
+    @apply border border-neon-purple/30;
+  }
+
+  .neon-glow-sm {
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.2);
+  }
+
+  .neon-glow-md {
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.3), 0 0 30px rgba(168, 85, 247, 0.1);
+  }
+
+  .neon-glow-lg {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.2), 0 0 60px rgba(168, 85, 247, 0.1);
+  }
+
+  .glass-panel {
+    @apply bg-bg-secondary/80 backdrop-blur-xl border border-white/5;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-neon-purple via-neon-blue to-neon-cyan;
+  }
+}
