@@ -5,9 +5,12 @@ import { BookOpen } from 'lucide-react';
 interface NovelCardGridProps {
   novels: NovelListItem[];
   loading?: boolean;
+  onEdit?: (novel: NovelListItem) => void;
+  onDelete?: (id: number) => void;
+  onArchive?: (id: number) => void;
 }
 
-export default function NovelCardGrid({ novels, loading }: NovelCardGridProps) {
+export default function NovelCardGrid({ novels, loading, onEdit, onDelete, onArchive }: NovelCardGridProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -45,7 +48,14 @@ export default function NovelCardGrid({ novels, loading }: NovelCardGridProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       {novels.map((novel, index) => (
-        <NovelCard key={novel.id} novel={novel} index={index} />
+        <NovelCard 
+          key={novel.id} 
+          novel={novel} 
+          index={index} 
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onArchive={onArchive}
+        />
       ))}
     </div>
   );

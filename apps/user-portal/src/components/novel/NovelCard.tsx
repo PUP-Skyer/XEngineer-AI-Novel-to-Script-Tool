@@ -1,11 +1,14 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, Star, BookOpen } from 'lucide-react';
+import { Eye, Star, BookOpen, Clock, User, Edit, Trash2, Archive, ArchiveRestore } from 'lucide-react';
 import type { NovelListItem } from '@asg/shared';
 
 interface NovelCardProps {
   novel: NovelListItem;
   index?: number;
+  onEdit?: (novel: NovelListItem) => void;
+  onDelete?: (id: number) => void;
+  onArchive?: (id: number) => void;
 }
 
 const genreLabels: Record<string, string> = {
@@ -32,16 +35,52 @@ const genreColors: Record<string, string> = {
   other: 'text-text-secondary bg-white/5 border-white/10',
 };
 
-export default function NovelCard({ novel, index = 0 }: NovelCardProps) {
+export default function NovelCard({ novel, index = 0, onEdit, onDelete, onArchive }: NovelCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
+      className="relative group"
     >
+      {/* Action Buttons - shown on hover */}
+      <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+        {onEdit && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(novel); }}
+            className="p-1.5 bg-bg-secondary/80 backdrop-blur-sm rounded-lg text-text-secondary hover:text-neon-purple hover:bg-bg-secondary transition-colors"
+            title="编辑"
+          >
+            <Edit className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {onArchive && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onArchive(novel.id); }}
+            className={`p-1.5 bg-bg-secondary/80 backdrop-blur-sm rounded-lg transition-colors ${
+              (novel as any).archived 
+                ? 'text-neon-green hover:text-neon-green/80' 
+                : 'text-text-secondary hover:text-neon-purple'
+            }`}
+            title={(novel as any).archived ? '已存档' : '存档'}
+          >
+            {(novel as any).archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(novel.id); }}
+            className="p-1.5 bg-bg-secondary/80 backdrop-blur-sm rounded-lg text-text-secondary hover:text-red-400 transition-colors"
+            title="删除"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
       <Link to={`/novels/${novel.id}`}>
         <motion.div
-          className="group relative bg-bg-secondary border border-white/5 rounded-2xl overflow-hidden cursor-pointer h-full"
+          className="relative bg-bg-secondary border border-white/5 rounded-2xl overflow-hidden cursor-pointer h-full"
           whileHover={{
             y: -6,
             borderColor: 'rgba(168, 85, 247, 0.3)',
@@ -75,6 +114,15 @@ export default function NovelCard({ novel, index = 0 }: NovelCardProps) {
                 {genreLabels[novel.genre] || novel.genre}
               </span>
             </div>
+
+            {/* Archived Badge */}
+            {(novel as any).archived && (
+              <div className="absolute top-3 right-3">
+                <span className="text-xs font-medium px-2 py-1 rounded-full bg-neon-green/20 text-neon-green border border-neon-green/30">
+                  已存档
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -103,18 +151,36 @@ export default function NovelCard({ novel, index = 0 }: NovelCardProps) {
               </div>
             )}
 
+            {/* Import Info */}
+            {novel.description && (
+              <div className="flex flex-wrap gap-2 text-xs text-text-muted">
+                {novel.description.includes('导入时间:') && (
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>{novel.description.match(/导入时间: ([^·]+)/)?.[1]?.trim() || ''}</span>
+                  </div>
+                )}
+                {novel.description.includes('导入者:') && (
+                  <div className="flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    <span>{novel.description.match(/导入者: ([^·]+)/)?.[1]?.trim() || '匿名用户'}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Stats */}
             <div className="flex items-center gap-4 pt-2 border-t border-white/5">
               <div className="flex items-center gap-1 text-xs text-text-muted">
                 <Eye className="w-3.5 h-3.5" />
-                <span>{novel.viewCount.toLocaleString()}</span>
+                <span>{novel.viewCount?.toLocaleString() || '0'}</span>
               </div>
               <div className="flex items-center gap-1 text-xs text-text-muted">
                 <Star className="w-3.5 h-3.5" />
                 <span>{novel.avgRating > 0 ? novel.avgRating.toFixed(1) : '暂无'}</span>
               </div>
               <div className="text-xs text-text-muted ml-auto">
-                {novel.wordCount.toLocaleString()} 字
+                {novel.wordCount?.toLocaleString() || '0'} 字
               </div>
             </div>
           </div>
