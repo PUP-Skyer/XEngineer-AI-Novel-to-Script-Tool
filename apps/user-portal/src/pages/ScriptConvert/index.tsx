@@ -1,7 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Users, Wand2, FileText, CheckCircle, AlertCircle, Loader2, ArrowLeft, Sparkles } from 'lucide-react';
+import {
+  BookOpen, Users, Wand2, FileText, CheckCircle, AlertCircle, Loader2, ArrowLeft, Sparkles,
+  Clock, Mic, Camera, Music, Volume2
+} from 'lucide-react';
 import scriptService from '@/services/scriptService';
 import Button from '@/components/ui/Button';
 
@@ -12,17 +15,24 @@ interface ConvertProgress {
   progress: number;
   message: string;
   scriptId?: number;
+  scriptStats?: {
+    totalScenes: number;
+    totalDialogues: number;
+    totalShots: number;
+    totalChoices: number;
+    totalDuration: number;
+    characterCount: number;
+  };
   error?: string;
 }
 
 const PHASES: { key: ConvertPhase; label: string; icon: typeof BookOpen; description: string }[] = [
-  { key: 'analyzing', label: '解析小说', icon: BookOpen, description: 'AI 正在分析小说结构、人物关系和情节线...' },
-  { key: 'characters', label: '生成角色', icon: Users, description: '正在提取并设定虚拟角色的性格、背景和秘密...' },
-  { key: 'scenes', label: '划分场景', icon: Wand2, description: '正在将故事拆分为独立场景并设计选择分支...' },
-  { key: 'dialogues', label: '创作对白', icon: FileText, description: '正在基于角色性格创作自然对白...' },
+  { key: 'analyzing', label: '解析小说', icon: BookOpen, description: 'AI 正在分析小说10章完整结构、人物关系和情节线...' },
+  { key: 'characters', label: '生成角色', icon: Users, description: '提取角色设定，分配AI人声音色（清亮/低沉/沙哑/清冷等）...' },
+  { key: 'scenes', label: '划分场景', icon: Wand2, description: '将故事拆分为30+场景，每场标注分镜、机位、音效和BGM...' },
+  { key: 'dialogues', label: '创作对白', icon: FileText, description: '基于角色性格创作完整对白，标注每句情感和语音风格...' },
 ];
 
-// 模拟进度（实际项目中应由后端轮询驱动）
 const MOCK_PHASE_PROGRESS: Record<ConvertPhase, number> = {
   confirm: 0,
   analyzing: 15,
@@ -36,6 +46,7 @@ const MOCK_PHASE_PROGRESS: Record<ConvertPhase, number> = {
 export default function ScriptConvert() {
   const { novelId } = useParams<{ novelId: string }>();
   const navigate = useNavigate();
+  const pollingRef = useRef<number | null>(null);
 
   const [progress, setProgress] = useState<ConvertProgress>({
     phase: 'confirm',
@@ -46,8 +57,7 @@ export default function ScriptConvert() {
   const [taskId, setTaskId] = useState<string>('');
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(-1);
 
-  // 开始转换
-  const startConversion = useCallback(async () => {
+  const startConversion = async () => {
     if (!novelId) return;
     const id = Number(novelId);
 
@@ -57,8 +67,6 @@ export default function ScriptConvert() {
     try {
       const result = await scriptService.convertNovel(id);
       setTaskId(result.taskId);
-
-      // 模拟阶段推进（实际应轮询 getConvertStatus）
       simulateProgress(result.taskId, id);
     } catch (err: any) {
       setProgress({
@@ -68,16 +76,14 @@ export default function ScriptConvert() {
         error: err?.response?.data?.message || err?.message,
       });
     }
-  }, [novelId]);
+  };
 
-  // 模拟进度推进
   const simulateProgress = (taskId: string, novelId: number) => {
     const phases: ConvertPhase[] = ['analyzing', 'characters', 'scenes', 'dialogues'];
     let index = 0;
 
     const advancePhase = () => {
       if (index >= phases.length) {
-        // 轮询后端获取最终结果
         pollForResult(taskId, novelId);
         return;
       }
@@ -91,7 +97,6 @@ export default function ScriptConvert() {
       });
 
       index++;
-      // 基于阶段的延迟（分析快，对白慢）
       const delay = phase === 'dialogues' ? 4000 : phase === 'scenes' ? 3000 : 2000;
       setTimeout(advancePhase, delay);
     };
@@ -99,10 +104,9 @@ export default function ScriptConvert() {
     advancePhase();
   };
 
-  // 轮询后端获取转换结果
   const pollForResult = async (taskId: string, novelId: number) => {
     let attempts = 0;
-    const maxAttempts = 60; // 最多轮询 60 次
+    const maxAttempts = 60;
 
     const poll = async () => {
       attempts++;
@@ -114,6 +118,7 @@ export default function ScriptConvert() {
             progress: 100,
             message: '剧本转换完成！',
             scriptId: status.scriptId,
+            scriptStats: status.stats,
           });
           return;
         }
@@ -127,9 +132,8 @@ export default function ScriptConvert() {
           return;
         }
         if (attempts < maxAttempts) {
-          setTimeout(poll, 2000);
+          pollingRef.current = window.setTimeout(poll, 2000);
         } else {
-          // 超时，尝试直接查找剧本
           try {
             const scripts = await scriptService.getScriptList({ page: 1, pageSize: 10 });
             const found = scripts.items.find((s) => s.novelId === novelId);
@@ -144,7 +148,7 @@ export default function ScriptConvert() {
         }
       } catch {
         if (attempts < maxAttempts) {
-          setTimeout(poll, 2000);
+          pollingRef.current = window.setTimeout(poll, 2000);
         } else {
           setProgress({ phase: 'error', progress: 0, message: '无法获取转换状态', error: 'poll_failed' });
         }
@@ -154,7 +158,12 @@ export default function ScriptConvert() {
     poll();
   };
 
-  // 进度条动画
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearTimeout(pollingRef.current);
+    };
+  }, []);
+
   const ProgressBar = () => (
     <div className="w-full bg-bg-tertiary rounded-full h-3 overflow-hidden">
       <motion.div
@@ -170,17 +179,14 @@ export default function ScriptConvert() {
     </div>
   );
 
-  // 阶段指示器
   const PhaseIndicator = () => (
     <div className="flex items-center justify-between w-full max-w-2xl mx-auto mb-8">
       {PHASES.map((phase, index) => {
         const isCompleted = currentPhaseIndex > index;
         const isCurrent = currentPhaseIndex === index;
         const Icon = phase.icon;
-
         return (
           <div key={phase.key} className="flex flex-col items-center relative">
-            {/* 连接线 */}
             {index < PHASES.length - 1 && (
               <div
                 className="absolute top-5 left-full w-12 sm:w-16 lg:w-24 h-0.5"
@@ -191,7 +197,6 @@ export default function ScriptConvert() {
                 }}
               />
             )}
-            {/* 圆圈 */}
             <motion.div
               className={`w-10 h-10 rounded-full flex items-center justify-center z-10 ${
                 isCompleted
@@ -213,12 +218,7 @@ export default function ScriptConvert() {
                 />
               )}
             </motion.div>
-            {/* 标签 */}
-            <span
-              className={`mt-2 text-xs font-medium ${
-                isCompleted || isCurrent ? 'text-text-primary' : 'text-text-muted'
-              }`}
-            >
+            <span className={`mt-2 text-xs font-medium ${isCompleted || isCurrent ? 'text-text-primary' : 'text-text-muted'}`}>
               {phase.label}
             </span>
           </div>
@@ -227,70 +227,34 @@ export default function ScriptConvert() {
     </div>
   );
 
-  // 确认页面
   if (progress.phase === 'confirm') {
     return (
       <div className="min-h-[calc(100vh-80px)] flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-lg w-full"
-        >
-          <Link
-            to={novelId ? `/novels/${novelId}` : '/novels'}
-            className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-6"
-          >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-lg w-full">
+          <Link to={novelId ? `/novels/${novelId}` : '/novels'} className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-6">
             <ArrowLeft className="w-4 h-4" />
             返回小说详情
           </Link>
-
           <div className="neon-card p-8 text-center">
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-neon-purple/10 border border-neon-purple/30 flex items-center justify-center">
               <Sparkles className="w-10 h-10 text-neon-purple" />
             </div>
-
-            <h1 className="text-2xl font-bold text-text-primary mb-3">
-              AI 剧本转换
-            </h1>
-            <p className="text-text-secondary mb-2">
-              将你的小说转化为沉浸式剧本杀
-            </p>
-            {novelTitle && (
-              <p className="text-neon-purple font-medium mb-6">
-                「{novelTitle}」
-              </p>
-            )}
+            <h1 className="text-2xl font-bold text-text-primary mb-3">AI 剧本转换 v2.0</h1>
+            <p className="text-text-secondary mb-2">将小说完整10章内容转换为沉浸式剧本</p>
+            {novelTitle && <p className="text-neon-purple font-medium mb-6">「{novelTitle}」</p>}
 
             <div className="bg-bg-tertiary rounded-lg p-4 mb-6 text-left">
-              <h3 className="text-sm font-medium text-text-primary mb-3">
-                转换过程将包含：
-              </h3>
+              <h3 className="text-sm font-medium text-text-primary mb-3">全新升级包含：</h3>
               <ul className="space-y-2 text-sm text-text-secondary">
-                <li className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-neon-blue" />
-                  虚拟角色设定（性格、背景、秘密、动机）
-                </li>
-                <li className="flex items-center gap-2">
-                  <Wand2 className="w-4 h-4 text-neon-purple" />
-                  场景划分与选择分支设计
-                </li>
-                <li className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-neon-cyan" />
-                  基于角色性格的自然对白生成
-                </li>
-                <li className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-neon-green" />
-                  YAML 格式结构化剧本输出
-                </li>
+                <li className="flex items-center gap-2"><Users className="w-4 h-4 text-neon-blue" /> 完整角色设定 + <span className="text-neon-cyan">AI人声音色</span>（清亮/低沉/沙哑/清冷）</li>
+                <li className="flex items-center gap-2"><Camera className="w-4 h-4 text-neon-purple" /> <span className="text-neon-cyan">30+分镜头</span>（机位、景别、镜头语言、转场方式）</li>
+                <li className="flex items-center gap-2"><Mic className="w-4 h-4 text-neon-cyan" /> 完整对白 + 每句<span className="text-neon-cyan">情感标注</span> + 语音风格</li>
+                <li className="flex items-center gap-2"><Music className="w-4 h-4 text-neon-green" /> 场景 <span className="text-neon-cyan">BGM</span> + <span className="text-neon-cyan">音效</span> 设计（雷声/脚步声/心跳声等）</li>
+                <li className="flex items-center gap-2"><Clock className="w-4 h-4 text-neon-pink" /> 总时长 <span className="text-neon-cyan">30-60 分钟</span>，分场景时长标注</li>
               </ul>
             </div>
 
-            <Button
-              onClick={startConversion}
-              variant="primary"
-              size="lg"
-              className="w-full"
-            >
+            <Button onClick={startConversion} variant="primary" size="lg" className="w-full">
               <Sparkles className="w-5 h-5 mr-2" />
               开始转换
             </Button>
@@ -300,15 +264,10 @@ export default function ScriptConvert() {
     );
   }
 
-  // 错误页面
   if (progress.phase === 'error') {
     return (
       <div className="min-h-[calc(100vh-80px)] flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-lg w-full"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="max-w-lg w-full">
           <div className="neon-card p-8 text-center">
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center">
               <AlertCircle className="w-10 h-10 text-red-400" />
@@ -316,12 +275,8 @@ export default function ScriptConvert() {
             <h1 className="text-2xl font-bold text-text-primary mb-3">转换失败</h1>
             <p className="text-text-secondary mb-6">{progress.error || '未知错误'}</p>
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate(novelId ? `/novels/${novelId}` : '/novels')} variant="ghost">
-                返回
-              </Button>
-              <Button onClick={startConversion} variant="primary">
-                重新尝试
-              </Button>
+              <Button onClick={() => navigate(novelId ? `/novels/${novelId}` : '/novels')} variant="ghost">返回</Button>
+              <Button onClick={startConversion} variant="primary">重新尝试</Button>
             </div>
           </div>
         </motion.div>
@@ -329,15 +284,10 @@ export default function ScriptConvert() {
     );
   }
 
-  // 完成页面
   if (progress.phase === 'completed') {
     return (
       <div className="min-h-[calc(100vh-80px)] flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-lg w-full"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="max-w-xl w-full">
           <div className="neon-card p-8 text-center">
             <motion.div
               className="w-20 h-20 mx-auto mb-6 rounded-full bg-neon-green/10 border border-neon-green/30 flex items-center justify-center"
@@ -346,21 +296,53 @@ export default function ScriptConvert() {
             >
               <CheckCircle className="w-10 h-10 text-neon-green" />
             </motion.div>
-            <h1 className="text-2xl font-bold text-text-primary mb-3">转换完成！</h1>
-            <p className="text-text-secondary mb-6">
-              你的剧本已生成，包含完整的角色设定和对白
+            <h1 className="text-2xl font-bold text-text-primary mb-2">转换完成！</h1>
+
+            {progress.scriptStats && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 my-6">
+                <div className="bg-bg-tertiary rounded-xl p-3">
+                  <Camera className="w-5 h-5 text-neon-purple mx-auto mb-1" />
+                  <div className="text-xl font-bold text-text-primary">{progress.scriptStats.totalScenes}</div>
+                  <div className="text-xs text-text-muted">场景</div>
+                </div>
+                <div className="bg-bg-tertiary rounded-xl p-3">
+                  <Mic className="w-5 h-5 text-neon-cyan mx-auto mb-1" />
+                  <div className="text-xl font-bold text-text-primary">{progress.scriptStats.totalDialogues}</div>
+                  <div className="text-xs text-text-muted">对话/旁白</div>
+                </div>
+                <div className="bg-bg-tertiary rounded-xl p-3">
+                  <Clock className="w-5 h-5 text-neon-green mx-auto mb-1" />
+                  <div className="text-xl font-bold text-text-primary">{Math.round(progress.scriptStats.totalDuration)}</div>
+                  <div className="text-xs text-text-muted">分钟预计时长</div>
+                </div>
+                <div className="bg-bg-tertiary rounded-xl p-3">
+                  <Users className="w-5 h-5 text-neon-blue mx-auto mb-1" />
+                  <div className="text-xl font-bold text-text-primary">{progress.scriptStats.characterCount}</div>
+                  <div className="text-xs text-text-muted">角色（含配音）</div>
+                </div>
+                <div className="bg-bg-tertiary rounded-xl p-3">
+                  <Wand2 className="w-5 h-5 text-neon-pink mx-auto mb-1" />
+                  <div className="text-xl font-bold text-text-primary">{progress.scriptStats.totalShots}</div>
+                  <div className="text-xs text-text-muted">分镜头</div>
+                </div>
+                <div className="bg-bg-tertiary rounded-xl p-3">
+                  <Music className="w-5 h-5 text-amber-400 mx-auto mb-1" />
+                  <div className="text-xl font-bold text-text-primary">{progress.scriptStats.totalChoices}</div>
+                  <div className="text-xs text-text-muted">剧情分支</div>
+                </div>
+              </div>
+            )}
+
+            <p className="text-text-secondary mb-6 text-sm">
+              完整覆盖10章，包含完整角色对白、分镜脚本、BGM及音效设计
             </p>
+
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate('/novels')} variant="ghost">
-                返回陈列馆
-              </Button>
+              <Button onClick={() => navigate('/novels')} variant="ghost">返回陈列馆</Button>
               {progress.scriptId && (
-                <Button
-                  onClick={() => navigate(`/scripts/${progress.scriptId}`)}
-                  variant="primary"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  查看剧本
+                <Button onClick={() => navigate(`/scripts/${progress.scriptId}`)} variant="primary">
+                  <Volume2 className="w-4 h-4 mr-2" />
+                  查看完整剧本
                 </Button>
               )}
             </div>
@@ -370,29 +352,21 @@ export default function ScriptConvert() {
     );
   }
 
-  // 转换进行中
   return (
     <div className="min-h-[calc(100vh-80px)] flex items-center justify-center p-6">
       <div className="max-w-2xl w-full">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <PhaseIndicator />
-
           <div className="neon-card p-8">
             <div className="flex items-center gap-3 mb-6">
               <Loader2 className="w-6 h-6 text-neon-purple animate-spin" />
-              <h2 className="text-xl font-bold text-text-primary">
-                AI 正在创作你的剧本
-              </h2>
+              <h2 className="text-xl font-bold text-text-primary">AI 正在创作你的剧本</h2>
             </div>
-
             <ProgressBar />
-
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-text-secondary">{progress.message}</span>
               <span className="text-neon-purple font-medium">{progress.progress}%</span>
             </div>
-
-            {/* 当前阶段详情 */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={progress.phase}
@@ -419,9 +393,8 @@ export default function ScriptConvert() {
                 })()}
               </motion.div>
             </AnimatePresence>
-
             <p className="text-xs text-text-muted mt-6 text-center">
-              转换通常需要 1-3 分钟，请耐心等待...
+              基于小说完整10章内容转换，预计生成30+场景 · 30+分钟完整剧本
             </p>
           </div>
         </motion.div>
