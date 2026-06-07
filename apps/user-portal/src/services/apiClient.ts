@@ -42,3 +42,18 @@ function createApiClient(): AxiosInstance {
 
 export const apiClient = createApiClient();
 export default apiClient;
+
+/* ------------------------------------------------------------------ */
+/*  User API helpers                                                  */
+/* ------------------------------------------------------------------ */
+
+export const userApi = {
+  login: async (data: { email: string; password: string }) => {
+    const res = await apiClient.post('/auth/login', data);
+    return res.data?.data ?? res.data;
+  },
+  register: async (data: { username: string; email: string; password: string }) => {
+    const res = await apiClient.post('/auth/register', data);
+    return res.data?.data ?? res.data;
+  },
+};
