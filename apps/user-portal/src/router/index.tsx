@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import Home from '@/pages/Home';
 import NovelGallery from '@/pages/NovelGallery';
@@ -24,6 +24,7 @@ const router = createBrowserRouter([
       { path: 'novels/:id', element: <NovelDetail /> },
       { path: 'scripts/convert/:novelId', element: <ScriptConvert /> },
       { path: 'scripts/:id', element: <ScriptEditor /> },
+      { path: 'game', element: <Navigate to="/game/lobby" replace /> },
       { path: 'game/lobby', element: <GameLobby /> },
       { path: 'game/room/:code', element: <GameRoom /> },
       { path: 'leaderboard', element: <Leaderboard /> },

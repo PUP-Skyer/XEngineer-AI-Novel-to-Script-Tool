@@ -149,7 +149,7 @@ export default function NovelDetail() {
             <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-6">
               <div className="flex items-center gap-1.5">
                 <Eye className="w-4 h-4" />
-                {novel.viewCount.toLocaleString()} 浏览
+                {novel.viewCount?.toLocaleString() || '0'} 浏览
               </div>
               <div className="flex items-center gap-1.5">
                 <Star className="w-4 h-4" />
@@ -157,7 +157,7 @@ export default function NovelDetail() {
               </div>
               <div className="flex items-center gap-1.5">
                 <BookOpen className="w-4 h-4" />
-                {novel.wordCount.toLocaleString()} 字
+                {novel.wordCount?.toLocaleString() || '0'} 字
               </div>
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" />
@@ -214,7 +214,7 @@ export default function NovelDetail() {
             正文
           </h2>
           <div className="prose prose-invert max-w-none">
-            {novel.content.split('\n').map((paragraph, index) =>
+            {(novel.content || '').split('\n').map((paragraph, index) =>
               paragraph.trim() ? (
                 <p
                   key={index}

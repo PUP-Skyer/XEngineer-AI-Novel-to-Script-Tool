@@ -10,13 +10,18 @@ import {
   Menu,
   X,
   ChevronDown,
+  Wand2,
+  FileText,
+  Trophy,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 
 const navLinks = [
   { to: '/', label: '首页', icon: Sparkles },
   { to: '/novels', label: '小说陈列馆', icon: BookOpen },
+  { to: '/scripts/convert/1', label: '剧本转换', icon: Wand2 },
   { to: '/game/lobby', label: '游戏大厅', icon: Gamepad2 },
+  { to: '/leaderboard', label: '排行榜', icon: Trophy },
 ];
 
 export default function TopNavbar() {
@@ -51,7 +56,7 @@ export default function TopNavbar() {
             const isActive =
               link.to === '/'
                 ? location.pathname === '/'
-                : location.pathname.startsWith(link.to);
+                : location.pathname.startsWith(link.to.split('/').slice(0, -1).join('/') || link.to);
             return (
               <Link key={link.to} to={link.to}>
                 <motion.div
@@ -175,7 +180,7 @@ export default function TopNavbar() {
                 const isActive =
                   link.to === '/'
                     ? location.pathname === '/'
-                    : location.pathname.startsWith(link.to);
+                    : location.pathname.startsWith(link.to.split('/').slice(0, -1).join('/') || link.to);
                 return (
                   <Link
                     key={link.to}

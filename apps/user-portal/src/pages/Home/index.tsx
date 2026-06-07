@@ -14,6 +14,7 @@ const features = [
     description: '输入你的创意灵感，AI 为你打造独一无二的原创小说，支持多种题材风格。',
     color: 'from-neon-purple to-neon-blue',
     glowColor: 'rgba(168, 85, 247, 0.3)',
+    link: '/novels/create',
   },
   {
     icon: ScrollText,
@@ -21,6 +22,7 @@ const features = [
     description: '一键将小说转换为剧本杀脚本，自动生成角色、场景和对白。',
     color: 'from-neon-blue to-neon-cyan',
     glowColor: 'rgba(99, 102, 241, 0.3)',
+    link: '/scripts/convert/1',
   },
   {
     icon: Users,
@@ -28,6 +30,7 @@ const features = [
     description: '邀请好友或匹配陌生人，沉浸在 AI 驱动的沉浸式剧本杀体验中。',
     color: 'from-neon-cyan to-neon-green',
     glowColor: 'rgba(34, 211, 238, 0.3)',
+    link: '/game/lobby',
   },
 ];
 
@@ -136,17 +139,17 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                className="group relative bg-bg-secondary border border-white/5 rounded-2xl p-8 hover:border-neon-purple/20 transition-all duration-300"
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.15, duration: 0.5 }}
-                whileHover={{
-                  y: -6,
-                  boxShadow: `0 0 30px ${feature.glowColor}`,
-                }}
+              <Link key={feature.title} to={feature.link}>
+                <motion.div
+                  className="group relative bg-bg-secondary border border-white/5 rounded-2xl p-8 hover:border-neon-purple/20 transition-all duration-300 cursor-pointer"
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.15, duration: 0.5 }}
+                  whileHover={{
+                    y: -6,
+                    boxShadow: `0 0 30px ${feature.glowColor}`,
+                  }}
               >
                 <div
                   className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-6 shadow-lg`}
@@ -160,6 +163,7 @@ export default function Home() {
                   {feature.description}
                 </p>
               </motion.div>
+              </Link>
             ))}
           </div>
         </div>
