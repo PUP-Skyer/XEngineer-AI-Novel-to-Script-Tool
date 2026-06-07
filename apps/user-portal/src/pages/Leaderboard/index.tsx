@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
   BookOpen,
   Users,
@@ -11,8 +12,11 @@ import {
   Star,
   Heart,
   Gamepad2,
+  Loader2,
 } from 'lucide-react';
 import Card from '@/components/ui/Card';
+import { novelService } from '@/services/novelService';
+import type { NovelListItem } from '@asg/shared';
 
 type TabKey = 'novels' | 'players' | 'scripts';
 
@@ -26,20 +30,6 @@ const tabs: TabItem[] = [
   { key: 'novels', label: '热门小说', icon: <BookOpen className="w-4 h-4" /> },
   { key: 'players', label: '玩家排行', icon: <Users className="w-4 h-4" /> },
   { key: 'scripts', label: '热门剧本', icon: <ScrollText className="w-4 h-4" /> },
-];
-
-// Mock data: Hot Novels
-const mockNovels = [
-  { rank: 1, title: '迷雾古堡', author: '暗夜猎手', viewCount: 45200, avgRating: 4.9, favoriteCount: 1280, genre: '悬疑' },
-  { rank: 2, title: '末日生存', author: '星辰旅者', viewCount: 38700, avgRating: 4.8, favoriteCount: 980, genre: '恐怖' },
-  { rank: 3, title: '赛博迷局', author: '月影诗人', viewCount: 32100, avgRating: 4.7, favoriteCount: 856, genre: '科幻' },
-  { rank: 4, title: '星辰旅途', author: '风之旅人', viewCount: 28400, avgRating: 4.6, favoriteCount: 723, genre: '奇幻' },
-  { rank: 5, title: '谍影重重', author: '暗夜猎手', viewCount: 25600, avgRating: 4.6, favoriteCount: 680, genre: '悬疑' },
-  { rank: 6, title: '龙与少年', author: '月影诗人', viewCount: 22100, avgRating: 4.5, favoriteCount: 540, genre: '奇幻' },
-  { rank: 7, title: '午夜列车', author: '风之旅人', viewCount: 19800, avgRating: 4.4, favoriteCount: 420, genre: '悬疑' },
-  { rank: 8, title: '时空裂隙', author: '星辰旅者', viewCount: 17500, avgRating: 4.3, favoriteCount: 380, genre: '科幻' },
-  { rank: 9, title: '深海密语', author: '幽灵船长', viewCount: 15200, avgRating: 4.2, favoriteCount: 310, genre: '恐怖' },
-  { rank: 10, title: '量子玫瑰', author: '星辰旅者', viewCount: 13800, avgRating: 4.1, favoriteCount: 280, genre: '科幻' },
 ];
 
 // Mock data: Player Rankings
@@ -82,8 +72,40 @@ const difficultyColors: Record<string, string> = {
   '困难': 'text-neon-pink bg-neon-pink/10 border-neon-pink/20',
 };
 
+const genreLabels: Record<string, string> = {
+  suspense: '悬疑',
+  fantasy: '奇幻',
+  scifi: '科幻',
+  romance: '言情',
+  horror: '恐怖',
+  action: '动作',
+  comedy: '喜剧',
+  drama: '剧情',
+  other: '其他',
+};
+
 export default function Leaderboard() {
   const [activeTab, setActiveTab] = useState<TabKey>('novels');
+  const [archivedNovels, setArchivedNovels] = useState<NovelListItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'novels') {
+      fetchArchivedNovels();
+    }
+  }, [activeTab]);
+
+  const fetchArchivedNovels = async () => {
+    setLoading(true);
+    try {
+      const result = await novelService.getArchived({ page: 1, pageSize: 20, sort: 'rating' });
+      setArchivedNovels(result.data || []);
+    } catch (err) {
+      console.error('Failed to fetch archived novels:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -137,71 +159,93 @@ export default function Leaderboard() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {/* Hot Novels */}
+              {/* Hot Novels - Only Archived */}
               {activeTab === 'novels' && (
                 <div className="space-y-3">
-                  {mockNovels.map((novel, index) => {
-                    const rankInfo = rankIcons[novel.rank];
+                  {loading ? (
+                    <div className="flex items-center justify-center py-20">
+                      <Loader2 className="w-8 h-8 animate-spin text-neon-purple" />
+                    </div>
+                  ) : archivedNovels.length === 0 ? (
+                    <div className="text-center py-20 text-text-muted">
+                      <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                      <p>暂无已存档的小说</p>
+                      <p className="text-sm mt-1">去小说陈列馆存档作品吧</p>
+                    </div>
+                  ) : (
+                    archivedNovels.map((novel, index) => {
+                      const rank = index + 1;
+                      const rankInfo = rankIcons[rank];
 
-                    return (
-                      <motion.div
-                        key={novel.rank}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.04 }}
-                      >
-                        <Card padding="md" hoverable glowOnHover className="cursor-pointer">
-                          <div className="flex items-center gap-4">
-                            {/* Rank */}
-                            <div
-                              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                                rankInfo
-                                  ? 'bg-bg-tertiary'
-                                  : 'bg-bg-tertiary text-text-muted'
-                              } ${rankInfo?.color || ''}`}
-                            >
-                              {rankInfo ? (
-                                rankInfo.icon
-                              ) : (
-                                <span className="text-sm font-bold">{novel.rank}</span>
-                              )}
-                            </div>
+                      return (
+                        <motion.div
+                          key={novel.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.04 }}
+                        >
+                          <Link to={`/novels/${novel.id}`}>
+                            <Card padding="md" hoverable glowOnHover className="cursor-pointer">
+                              <div className="flex items-center gap-4">
+                                {/* Rank */}
+                                <div
+                                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                                    rankInfo
+                                      ? 'bg-bg-tertiary'
+                                      : 'bg-bg-tertiary text-text-muted'
+                                  } ${rankInfo?.color || ''}`}
+                                >
+                                  {rankInfo ? (
+                                    rankInfo.icon
+                                  ) : (
+                                    <span className="text-sm font-bold">{rank}</span>
+                                  )}
+                                </div>
 
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="text-sm font-semibold text-text-primary truncate">
-                                  {novel.title}
-                                </h4>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-muted">
-                                  {novel.genre}
-                                </span>
-                              </div>
-                              <p className="text-xs text-text-muted">
-                                作者: {novel.author}
-                              </p>
-                            </div>
+                                {/* Cover */}
+                                {novel.coverUrl && (
+                                  <div className="w-12 h-16 rounded-lg overflow-hidden shrink-0">
+                                    <img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover" />
+                                  </div>
+                                )}
 
-                            {/* Stats */}
-                            <div className="flex items-center gap-5 shrink-0">
-                              <div className="flex items-center gap-1 text-xs text-text-muted">
-                                <Eye className="w-3.5 h-3.5" />
-                                <span>{novel.viewCount.toLocaleString()}</span>
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="text-sm font-semibold text-text-primary truncate">
+                                      {novel.title}
+                                    </h4>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-text-muted">
+                                      {genreLabels[novel.genre] || novel.genre}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-text-muted line-clamp-1">
+                                    {novel.hook || novel.description}
+                                  </p>
+                                </div>
+
+                                {/* Stats */}
+                                <div className="flex items-center gap-5 shrink-0">
+                                  <div className="flex items-center gap-1 text-xs text-text-muted">
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>{(novel.viewCount || 0).toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs text-text-muted">
+                                    <Star className="w-3.5 h-3.5 text-neon-purple" />
+                                    <span>{novel.avgRating > 0 ? novel.avgRating.toFixed(1) : '暂无'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs text-text-muted">
+                                    <Heart className="w-3.5 h-3.5 text-neon-pink" />
+                                    <span>{(novel.favoriteCount || 0).toLocaleString()}</span>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1 text-xs text-text-muted">
-                                <Star className="w-3.5 h-3.5 text-neon-purple" />
-                                <span>{novel.avgRating.toFixed(1)}</span>
-                              </div>
-                              <div className="flex items-center gap-1 text-xs text-text-muted">
-                                <Heart className="w-3.5 h-3.5 text-neon-pink" />
-                                <span>{novel.favoriteCount.toLocaleString()}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                      </motion.div>
-                    );
-                  })}
+                            </Card>
+                          </Link>
+                        </motion.div>
+                      );
+                    })
+                  )}
                 </div>
               )}
 
