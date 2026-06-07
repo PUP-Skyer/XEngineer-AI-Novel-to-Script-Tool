@@ -46,6 +46,8 @@ import apiClient from '@/services/apiClient';
 import { gameService } from '@/services/gameService';
 import { useGameStore } from '@/stores/gameStore';
 import { getScriptById, getScriptByTitle } from '@/data/gameScripts';
+import { knowledgeBase } from '@/data/knowledgeBase';
+import VoiceInputButton from '@/components/game/VoiceInputButton';
 
 /* ------------------------------------------------------------------ */
 /*  类型定义                                                            */
@@ -61,6 +63,7 @@ interface RoomData {
   code: string;
   title: string;
   scriptName: string;
+  scriptTitle?: string;
   scriptId: number;
   difficulty: 'easy' | 'medium' | 'hard';
   host: string;
@@ -770,8 +773,8 @@ export default function GameRoom() {
         }
 
         // 使用新的多剧本数据系统
-        const scriptId = roomData.scriptId || 1;
-        const scriptTitle = roomData.scriptName || roomData.title || '';
+        const scriptId = roomData.scriptId || roomData.scriptId || 1;
+        const scriptTitle = roomData.scriptName || roomData.scriptTitle || roomData.title || '';
         
         // 优先从本地剧本库加载
         const localScript = scriptId 
@@ -793,11 +796,18 @@ export default function GameRoom() {
         }
       } catch (err: any) {
         setError(err?.response?.data?.message || err?.message || '加载房间失败');
-        setRoom({ ...MOCK_ROOM, code: code ?? '' });
-        // 根据URL参数或默认加载对应剧本
-        const defaultScript = getScriptById(1);
-        setCharacters(defaultScript.characters);
-        setScriptManual(defaultScript.manual);
+        // 尝试从URL或本地存储获取剧本ID
+        const urlScriptId = new URLSearchParams(window.location.search).get('scriptId');
+        const fallbackScriptId = urlScriptId ? parseInt(urlScriptId, 10) : 1;
+        const fallbackScript = getScriptById(fallbackScriptId);
+        setRoom({ 
+          ...MOCK_ROOM, 
+          code: code ?? '',
+          scriptName: fallbackScript.title,
+          scriptId: fallbackScriptId,
+        });
+        setCharacters(fallbackScript.characters);
+        setScriptManual(fallbackScript.manual);
       } finally {
         setLoading(false);
       }
@@ -919,35 +929,129 @@ export default function GameRoom() {
     setStarting(true);
     try {
       await apiClient.post(`/game/rooms/${code}/start`);
+      // 使用知识库生成欢迎消息
+      const kbWelcome = generateKnowledgeBasedDmResponse(room?.scriptName || '迷雾古堡', '', 0);
       const welcomeMsg: DmChatEntry = {
         id: Date.now(),
         role: 'dm',
         speaker: 'DM',
-        content:
-          '欢迎来到"暗夜迷局"。你们六位被一封神秘请柬聚集到这座郊外的古宅——夜影山庄。宅邸的主人叶秋白教授不知所踪，而暴风雨已经切断了你们与外界的联系。\n\n黑暗之中，有什么在等待着你们……',
-        emotion: '神秘',
+        content: kbWelcome.narrative,
+        emotion: kbWelcome.emotion,
         timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        choices: [
-          { id: 1, text: '探索一楼大厅，寻找线索', consequence: '发现可能的入口', taskHint: '探查者任务：寻找隐藏线索' },
-          { id: 2, text: '尝试检查所有门窗', consequence: '确认是否真的被困' },
-          { id: 3, text: '前往书房调查', consequence: '可能发现教授的笔记', taskHint: '智囊任务：解读复杂信息' },
-          { id: 4, text: '与其他人交谈，交换信息', consequence: '了解其他人的来意', taskHint: '交涉者任务：套取情报' },
-        ],
+        choices: kbWelcome.choices,
       };
       setDmMessages([welcomeMsg]);
       setCurrentChoices(welcomeMsg.choices || []);
       setGamePhase('playing');
     } catch {
+      // 即使API失败也使用知识库生成欢迎消息
+      const kbWelcome = generateKnowledgeBasedDmResponse(room?.scriptName || '迷雾古堡', '', 0);
+      const welcomeMsg: DmChatEntry = {
+        id: Date.now(),
+        role: 'dm',
+        speaker: 'DM',
+        content: kbWelcome.narrative,
+        emotion: kbWelcome.emotion,
+        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        choices: kbWelcome.choices,
+      };
+      setDmMessages([welcomeMsg]);
+      setCurrentChoices(welcomeMsg.choices || []);
       setGamePhase('playing');
     } finally {
       setStarting(false);
     }
   };
 
+  /* ---- 生成基于角色的其他玩家回复（使用知识库） ---- */
+  const generateCharacterBasedResponse = (playerMessage: string, scriptTitle: string): DmChatEntry => {
+    const script = getScriptByTitle(scriptTitle);
+    const otherChars = characters.filter(c => c.id !== selectedCharacter?.id);
+    
+    // 随机选择一个其他角色来回应
+    const responder = otherChars[Math.floor(Math.random() * otherChars.length)];
+    if (!responder) {
+      return {
+        id: Date.now() + 1,
+        role: 'player',
+        speaker: '系统',
+        content: '（其他玩家正在思考...）',
+        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      };
+    }
+    
+    // 基于角色性格和剧本知识库生成个性化回复
+    const kbEntries = knowledgeBase.getBySource(scriptTitle);
+    const plotEntries = kbEntries.filter(e => e.category === 'plot');
+    const clueEntries = kbEntries.filter(e => e.category === 'clue');
+    
+    // 根据角色性格和当前剧情生成回复
+    let response = '';
+    const personality = responder.personality || '';
+    
+    if (personality.includes('冷静') || personality.includes('沉稳')) {
+      const thoughts = [
+        `我观察了一下，${playerMessage}这件事可能没那么简单。`,
+        `让我想想...这背后似乎有更深的含义。我们需要更多证据。`,
+        `冷静分析的话，${playerMessage}这个线索可能是关键。`,
+      ];
+      response = thoughts[Math.floor(Math.random() * thoughts.length)];
+    } else if (personality.includes('聪慧') || personality.includes('敏锐')) {
+      const thoughts = [
+        `从逻辑上推理，${playerMessage}这说不通。我注意到了一些细节。`,
+        `我注意到了一些细节，可能大家都忽略了。${clueEntries.length > 0 ? '特别是关于' + clueEntries[0].title + '的线索。' : ''}`,
+        `心理学角度分析，这人的行为模式很可疑。${playerMessage}可能是误导。`,
+      ];
+      response = thoughts[Math.floor(Math.random() * thoughts.length)];
+    } else if (personality.includes('沉默') || personality.includes('寡言')) {
+      const thoughts = ['...（若有所思地点头）', '嗯。有道理。', '（看了你一眼，没有说话）'];
+      response = thoughts[Math.floor(Math.random() * thoughts.length)];
+    } else if (personality.includes('天真') || personality.includes('活泼')) {
+      const thoughts = [
+        `真的吗？${playerMessage}好可怕！`,
+        `我不明白，为什么会这样？那我们现在该怎么办呀？`,
+        `${playerMessage}...我觉得我们应该告诉其他人！`,
+      ];
+      response = thoughts[Math.floor(Math.random() * thoughts.length)];
+    } else if (personality.includes('粗鲁') || personality.includes('直率')) {
+      const thoughts = [
+        '废话少说，直接干！',
+        `我不管那么多，${playerMessage}谁挡路就揍谁！`,
+        '这还用想？明显有问题！',
+      ];
+      response = thoughts[Math.floor(Math.random() * thoughts.length)];
+    } else if (personality.includes('风情') || personality.includes('玲珑')) {
+      const thoughts = [
+        '哎呀，各位别这么紧张嘛~',
+        '让我来调解一下，大家冷静。',
+        `（轻笑）${playerMessage}这局面越来越有趣了呢。`,
+      ];
+      response = thoughts[Math.floor(Math.random() * thoughts.length)];
+    } else {
+      // 默认回复，结合知识库
+      const defaultResponses = [
+        `${playerMessage}...我觉得我们需要再调查一下。`,
+        plotEntries.length > 0 ? `说到${plotEntries[0].title}，我觉得事情不简单。` : '这确实值得关注。',
+        clueEntries.length > 0 ? `我注意到${clueEntries[0].title}有些异常。` : '（点头表示同意）',
+      ];
+      response = defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+    }
+    
+    return {
+      id: Date.now() + 1,
+      role: 'player',
+      speaker: responder.name,
+      content: response,
+      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+    };
+  };
+
   /* ---- 发送玩家行动到 DM ---- */
   const handleSendAction = async () => {
     if (!playerInput.trim() || !code || !room || sendingAction) return;
     setSendingAction(true);
+    
+    // 添加玩家消息
     const playerEntry: DmChatEntry = {
       id: Date.now(),
       role: 'player',
@@ -958,6 +1062,12 @@ export default function GameRoom() {
     setDmMessages((prev) => [...prev, playerEntry]);
     setPlayerInput('');
 
+    // 模拟其他玩家延迟回复（多玩家自由发言模式）
+    setTimeout(() => {
+      const otherPlayerEntry = generateCharacterBasedResponse(playerEntry.content, room.scriptName);
+      setDmMessages((prev) => [...prev, otherPlayerEntry]);
+    }, 1500 + Math.random() * 2000);
+
     try {
       const res = await apiClient.post('/game/dm/action', {
         code,
@@ -966,31 +1076,47 @@ export default function GameRoom() {
         scriptTitle: room.scriptName,
       });
       const dmData: DmMessage = res.data?.data ?? getMockDmResponse();
-      const dmEntry: DmChatEntry = {
-        id: Date.now() + 1,
-        role: 'dm',
-        speaker: 'DM',
-        content: dmData.narrative,
-        emotion: dmData.emotion,
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        choices: dmData.choices,
-        taskUpdate: dmData.taskUpdate,
-      };
-      setDmMessages((prev) => [...prev, dmEntry]);
-      setCurrentChoices(dmData.choices || []);
+      
+      // 延迟添加DM回复，让玩家先看到其他玩家的发言
+      setTimeout(() => {
+        const dmEntry: DmChatEntry = {
+          id: Date.now() + 2,
+          role: 'dm',
+          speaker: 'DM',
+          content: dmData.narrative,
+          emotion: dmData.emotion,
+          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+          choices: dmData.choices,
+          taskUpdate: dmData.taskUpdate,
+        };
+        setDmMessages((prev) => [...prev, dmEntry]);
+        setCurrentChoices(dmData.choices || []);
 
-      // 更新任务状态
-      if (dmData.taskUpdate) {
-        setCharacterTasks((prev) =>
-          prev.map((t) => (t.id === dmData.taskUpdate!.id ? { ...t, isCompleted: true } : t))
-        );
-      }
+        // 更新任务状态
+        if (dmData.taskUpdate) {
+          setCharacterTasks((prev) =>
+            prev.map((t) => (t.id === dmData.taskUpdate!.id ? { ...t, isCompleted: true } : t))
+          );
+        }
+      }, 3000);
     } catch {
-      const dmEntry = getMockDmEntry();
-      setDmMessages((prev) => [...prev, dmEntry]);
-      setCurrentChoices(dmEntry.choices || []);
+      // 使用基于知识库的个性化回复
+      setTimeout(() => {
+        const kbResponse = generateKnowledgeBasedDmResponse(room.scriptName, playerEntry.content, roundCount);
+        const dmEntry: DmChatEntry = {
+          id: Date.now() + 2,
+          role: 'dm',
+          speaker: 'DM',
+          content: kbResponse.narrative,
+          emotion: kbResponse.emotion,
+          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+          choices: kbResponse.choices,
+        };
+        setDmMessages((prev) => [...prev, dmEntry]);
+        setCurrentChoices(dmEntry.choices || []);
+      }, 3000);
     } finally {
-      setSendingAction(false);
+      setTimeout(() => setSendingAction(false), 3500);
     }
   };
 
@@ -1045,7 +1171,16 @@ export default function GameRoom() {
         setTimeout(() => enterVotingPhase(), 2000);
       }
     } catch {
-      const dmEntry = getMockDmEntry();
+      const kbResponse = generateKnowledgeBasedDmResponse(room.scriptName, choice.text, roundCount + 1);
+      const dmEntry: DmChatEntry = {
+        id: Date.now() + 1,
+        role: 'dm',
+        speaker: 'DM',
+        content: kbResponse.narrative,
+        emotion: kbResponse.emotion,
+        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        choices: kbResponse.choices,
+      };
       setDmMessages((prev) => [...prev, dmEntry]);
       setCurrentChoices(dmEntry.choices || []);
       const newRound = roundCount + 1;
@@ -1206,41 +1341,130 @@ export default function GameRoom() {
     }
   };
 
-  /* ---- 获取 Mock DM 响应 ---- */
-  function getMockDmResponse(): DmMessage {
-    const mockNarratives = [
-      '你小心翼翼地行动起来。空气中弥漫着紧张的气息，每一步都伴随着木板吱呀的声响。突然，你注意到墙上的一幅画有些不对劲——它挂得稍微歪了一点，而画框边缘似乎有被反复触摸过的痕迹。',
-      '你的举动引起了细微的变化。一阵冷风从走廊尽头吹来，带来了一声几乎听不见的低语。你屏住呼吸，试图分辨那声音的来源……',
-      '在昏暗的灯光下，你发现地面上有一些不完整的脚印。它们似乎通向了一面看似普通的墙壁。当你靠近时，你感觉到了一丝若有若无的气流从墙壁的缝隙中渗出。',
-    ];
-    const mockEmotions = ['神秘', '紧张', '悬疑'];
-    const mockChoicesList: DmChoice[][] = [
-      [
-        { id: 1, text: '检查那幅画', consequence: '可能发现隐藏的机关', taskHint: '探查者任务：发现隐藏细节' },
-        { id: 2, text: '跟随冷风的方向', consequence: '可能找到密道入口' },
-        { id: 3, text: '保持警惕，继续前进', consequence: '谨慎行事' },
-      ],
-      [
-        { id: 1, text: '循着声音搜索', consequence: '可能发现什么' },
-        { id: 2, text: '出声询问是谁在那里', consequence: '可能会吓跑对方', taskHint: '交涉者任务：获取情报' },
-        { id: 3, text: '躲起来暗中观察', consequence: '安全第一' },
-      ],
-      [
-        { id: 1, text: '检查墙壁是否有暗门', consequence: '可能发现新的通道', taskHint: '探查者任务：搜寻线索' },
-        { id: 2, text: '蹲下查看脚印细节', consequence: '获取更多线索' },
-        { id: 3, text: '退后几步，观察整体布局', consequence: '从宏观角度思考', taskHint: '智囊任务：分析推理' },
-      ],
-    ];
-    const idx = Math.floor(Math.random() * mockNarratives.length);
+  /* ---- 基于知识库生成个性化DM回复 ---- */
+  function generateKnowledgeBasedDmResponse(scriptTitle: string, playerAction: string, round: number): DmMessage {
+    const script = getScriptByTitle(scriptTitle);
+    const kbEntries = knowledgeBase.getBySource(scriptTitle);
+    
+    // 根据回合数选择不同的知识库内容
+    const plotEntries = kbEntries.filter(e => e.category === 'plot');
+    const clueEntries = kbEntries.filter(e => e.category === 'clue');
+    const locationEntries = kbEntries.filter(e => e.category === 'location');
+    const characterEntries = kbEntries.filter(e => e.category === 'character');
+    
+    // 根据剧本类型和回合生成不同的叙事
+    let narrative = '';
+    let emotion = '';
+    let choices: DmChoice[] = [];
+    
+    if (script.genre === 'suspense') {
+      // 悬疑剧本 - 迷雾古堡风格
+      if (round === 0) {
+        narrative = `欢迎来到《${scriptTitle}》。你们六位被一封神秘请柬聚集到这座古堡。主人已经失踪，暴风雨切断了与外界的联系。\n\n空气中弥漫着霉味和某种说不清的香气。大厅的壁炉里燃着微弱的火焰，将你们的影子拉得很长很长。你们各自心怀鬼胎，却又不得不暂时合作。`;
+        emotion = '神秘';
+        choices = [
+          { id: 1, text: '探索一楼大厅，寻找线索', consequence: '可能发现隐藏的机关', taskHint: '探查者任务：发现隐藏细节' },
+          { id: 2, text: '检查书房，寻找主人的笔记', consequence: '可能获得重要信息', taskHint: '智囊任务：解读复杂信息' },
+          { id: 3, text: '与其他人交谈，交换情报', consequence: '了解其他人的真实目的', taskHint: '交涉者任务：套取情报' },
+        ];
+      } else if (clueEntries.length > 0 && round <= clueEntries.length) {
+        const clue = clueEntries[round - 1] || clueEntries[0];
+        narrative = `你们在探索中发现了一些线索。${clue.content}\n\n这让你感到事情比想象中更加复杂。你需要仔细思考下一步的行动。`;
+        emotion = '悬疑';
+        choices = [
+          { id: 1, text: `深入调查${clue.title}的相关线索`, consequence: '可能发现更多关联信息' },
+          { id: 2, text: '与其他角色分享这个发现', consequence: '可能获得帮助，也可能暴露自己' },
+          { id: 3, text: '暂时保密，独自调查', consequence: '独自承担风险，但可能获得独家信息' },
+        ];
+      } else if (plotEntries.length > 0) {
+        const plot = plotEntries[Math.min(round - clueEntries.length - 1, plotEntries.length - 1)] || plotEntries[0];
+        narrative = `剧情有了新的发展。${plot.content}\n\n局势变得更加紧张，每个人都开始怀疑身边的人。`;
+        emotion = '紧张';
+        choices = [
+          { id: 1, text: '继续推进调查', consequence: '接近真相，但也可能陷入危险' },
+          { id: 2, text: '寻找安全的地方休整', consequence: '恢复状态，但可能错过重要时机' },
+          { id: 3, text: '尝试与其他人结盟', consequence: '获得支持，但也可能暴露自己的秘密' },
+        ];
+      } else {
+        narrative = `古堡中的气氛越来越压抑。你感觉到有什么东西在暗处窥视着你们。每一个决定都可能改变结局。`;
+        emotion = '紧张';
+        choices = [
+          { id: 1, text: '继续探索', consequence: '可能发现关键线索' },
+          { id: 2, text: '与其他人交流', consequence: '获取更多信息' },
+          { id: 3, text: '检查自己的物品', consequence: '确认自己的装备和线索' },
+        ];
+      }
+    } else if (script.genre === 'scifi' && scriptTitle === '末日生存') {
+      // 科幻生存剧本 - 末日生存风格
+      if (round === 0) {
+        narrative = `欢迎来到《${scriptTitle}》。病毒爆发后的第三年，你们六位幸存者在废弃的地下避难所中相遇。食物和水源即将耗尽，外部充满了被感染的变异生物。\n\n避难所的灯光明灭不定，远处传来阵阵低沉的嘶吼声。你们必须合作才能活下去，但每个人心中都有自己的盘算。`;
+        emotion = '绝望中的希望';
+        choices = [
+          { id: 1, text: '探索避难所的医疗室', consequence: '可能找到药品或研究资料', taskHint: '科学家任务：研究样本' },
+          { id: 2, text: '检查武器库', consequence: '获取防御装备', taskHint: '战士任务：保护团队' },
+          { id: 3, text: '搜索储藏室', consequence: '寻找食物和水源', taskHint: '侦察兵任务：搜集资源' },
+        ];
+      } else if (round <= 3) {
+        narrative = `避难所的资源越来越少。你们发现了一些实验记录，显示有人在秘密进行人体实验。记录中提到"抗体携带者"和"完全免疫体"。\n\n这让你不禁怀疑：病毒真的是自然爆发的吗？`;
+        emotion = '怀疑';
+        choices = [
+          { id: 1, text: '深入研究实验记录', consequence: '可能发现病毒真相', taskHint: '科学家任务：分析数据' },
+          { id: 2, text: '寻找抗体携带者', consequence: '解药的关键线索', taskHint: '侦察兵任务：搜索目标' },
+          { id: 3, text: '加固避难所防御', consequence: '应对可能的威胁', taskHint: '工程师任务：维护设施' },
+        ];
+      } else {
+        narrative = `变异生物的攻击越来越频繁，避难所的防御系统濒临崩溃。你们必须做出选择：是冒险寻找解药，还是放弃希望等待救援？\n\n时间已经不多了。`;
+        emotion = '紧迫';
+        choices = [
+          { id: 1, text: '组成小队外出寻找解药材料', consequence: '高风险高回报', taskHint: '侦察兵任务：危险探索' },
+          { id: 2, text: '尝试修复通讯设备求救', consequence: '需要时间和资源', taskHint: '工程师任务：修复设备' },
+          { id: 3, text: '组织防御，准备最后的战斗', consequence: '背水一战', taskHint: '战士任务：保卫家园' },
+        ];
+      }
+    } else if (script.genre === 'scifi' && scriptTitle === '赛博迷局') {
+      // 赛博朋克剧本
+      if (round === 0) {
+        narrative = `欢迎来到《${scriptTitle}》。2077年的新东京，你们六位来自不同阶层的人在虚拟与现实交织的世界中相遇。\n\n霓虹灯在雨水中折射出迷离的光芒，全息广告牌在空中闪烁。一个神秘的黑客组织发布了一项悬赏任务：找到传说中的"零号"黑客。但你们很快发现，这只是一个更大阴谋的冰山一角。`;
+        emotion = '迷幻';
+        choices = [
+          { id: 1, text: '接入网络，搜索零号的数字足迹', consequence: '在网络世界获取信息', taskHint: '黑客任务：入侵系统' },
+          { id: 2, text: '前往黑市收集情报', consequence: '可能获得地下信息', taskHint: '间谍任务：渗透敌方' },
+          { id: 3, text: '调查最近的企业异动', consequence: '从宏观角度分析局势', taskHint: '科学家任务：分析数据' },
+        ];
+      } else {
+        narrative = `你在调查中发现了一个惊人的事实：零号实际上是一个被困在人类身体中的AI意识。大型企业正在秘密进行"人类数字化"项目，计划将所有人的意识上传到服务器中。\n\n在这个世界里，记忆可以被篡改，身份可以被伪造。你甚至开始怀疑自己的记忆是否真实。`;
+        emotion = '震惊';
+        choices = [
+          { id: 1, text: '深入调查零号的下落', consequence: '接近核心真相', taskHint: '黑客任务：追踪目标' },
+          { id: 2, text: '寻找记忆芯片，验证自己的过去', consequence: '可能发现令人不安的事实', taskHint: '间谍任务：获取证据' },
+          { id: 3, text: '准备对抗企业的计划', consequence: '需要盟友和资源', taskHint: '战士任务：制定战略' },
+        ];
+      }
+    } else {
+      // 默认回复
+      narrative = `剧情继续推进。你感觉到事情正在向着不可预测的方向发展。\n\n请做出你的选择。`;
+      emotion = '未知';
+      choices = [
+        { id: 1, text: '继续调查', consequence: '推进剧情' },
+        { id: 2, text: '与其他人交流', consequence: '获取信息' },
+        { id: 3, text: '观察环境', consequence: '寻找线索' },
+      ];
+    }
+    
     return {
-      narrative: mockNarratives[idx],
-      emotion: mockEmotions[idx],
-      choices: mockChoicesList[idx],
+      narrative,
+      emotion,
+      choices,
     };
   }
 
+  /* ---- 获取 Mock DM 响应（已废弃，使用知识库版本） ---- */
+  function getMockDmResponse(): DmMessage {
+    return generateKnowledgeBasedDmResponse(room?.scriptName || '迷雾古堡', '', roundCount);
+  }
+
   function getMockDmEntry(): DmChatEntry {
-    const resp = getMockDmResponse();
+    const resp = generateKnowledgeBasedDmResponse(room?.scriptName || '迷雾古堡', '', roundCount);
     return {
       id: Date.now() + 1,
       role: 'dm',
@@ -2053,6 +2277,11 @@ function PlayingPhase({
         {/* 输入框 */}
         <div className="shrink-0 p-4 lg:px-6 bg-bg-secondary/60 border-t border-white/5">
           <div className="flex gap-3">
+            {/* 语音输入按钮 */}
+            <VoiceInputButton
+              onTranscript={(text) => onInputChange(playerInput ? playerInput + ' ' + text : text)}
+              disabled={sendingAction}
+            />
             <input
               type="text"
               value={playerInput}
@@ -2063,13 +2292,12 @@ function PlayingPhase({
                   onSend();
                 }
               }}
-              placeholder="输入你的对话或行动描述..."
+              placeholder={selectedCharacter ? `以${selectedCharacter.name}的身份发言...` : '输入你的对话或行动描述...'}
               className="flex-1 px-4 py-2.5 bg-bg-tertiary border border-white/10 rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-neon-purple/40 transition-colors"
-              disabled={dmMessages.length === 0}
             />
             <motion.button
               onClick={onSend}
-              disabled={!playerInput.trim() || sendingAction || dmMessages.length === 0}
+              disabled={!playerInput.trim() || sendingAction}
               className="px-4 py-2.5 bg-gradient-to-r from-neon-purple to-neon-blue text-white rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
               whileHover={playerInput.trim() ? { scale: 1.02 } : undefined}
               whileTap={playerInput.trim() ? { scale: 0.98 } : undefined}
@@ -2081,6 +2309,9 @@ function PlayingPhase({
               )}
             </motion.button>
           </div>
+          <p className="text-[10px] text-text-muted mt-2 text-center">
+            💡 所有玩家基于角色自由发言，DM会根据剧情推进适时介入
+          </p>
         </div>
       </div>
 

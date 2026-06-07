@@ -19,10 +19,12 @@ import {
   Sparkles,
   Flame,
   BarChart3,
+  X,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import apiClient from '@/services/apiClient';
+import { getAllScripts, getScriptByTitle, getScriptIdByTitle } from '@/data/gameScripts';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -188,6 +190,12 @@ export default function GameLobby() {
   const [commentRating, setCommentRating] = useState(5);
   const [submittingComment, setSubmittingComment] = useState(false);
 
+  /* ---- create room modal state ---- */
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createScriptId, setCreateScriptId] = useState(1);
+  const [createMaxPlayers, setCreateMaxPlayers] = useState(6);
+  const [creating, setCreating] = useState(false);
+
   /* ---- derived values ---- */
   const genres = [...new Set(scriptPopularity.map((s) => s.title.split('·')[0] ?? s.title))];
   const genrePlayerCounts = genres.map((g) => {
@@ -276,6 +284,42 @@ export default function GameLobby() {
             : c,
         ),
       );
+    }
+  };
+
+  /* ---- create room ---- */
+  const handleCreateRoom = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const res = await apiClient.post('/api/game/rooms', {
+        scriptId: createScriptId,
+        maxPlayers: createMaxPlayers,
+      });
+      const newRoom = res.data?.data;
+      if (newRoom?.roomCode) {
+        setShowCreateModal(false);
+        navigate(`/game/room/${newRoom.roomCode}?scriptId=${createScriptId}`);
+      }
+    } catch {
+      // Fallback: create locally and navigate
+      const mockCode = `ROOM${Date.now().toString(36).toUpperCase()}`;
+      const scriptNames = ['迷雾古堡', '末日生存', '赛博迷局'];
+      const newRoom: RoomData = {
+        id: Date.now(),
+        roomCode: mockCode,
+        scriptTitle: scriptNames[createScriptId - 1] || '迷雾古堡',
+        status: 'waiting',
+        playerCount: 1,
+        maxPlayers: createMaxPlayers,
+        hostName: '我',
+        rating: 0,
+      };
+      setAllRooms((prev) => [newRoom, ...prev]);
+      setShowCreateModal(false);
+      navigate(`/game/room/${mockCode}?scriptId=${createScriptId}`);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -407,7 +451,10 @@ export default function GameLobby() {
                   transition={{ delay: 0.04 * i }}
                 >
                   <div className="group relative bg-bg-secondary/60 backdrop-blur-sm border border-white/5 rounded-2xl p-5 hover:border-neon-purple/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.12)] transition-all duration-300 cursor-pointer"
-                    onClick={() => navigate(`/game/room/${room.roomCode}`)}
+                    onClick={() => {
+                      const scriptId = getScriptIdByTitle(room.scriptTitle);
+                      navigate(`/game/room/${room.roomCode}?scriptId=${scriptId}`);
+                    }}
                   >
                     {/* Heat indicator */}
                     <div className="absolute top-3 right-3 flex items-center gap-1 text-xs text-neon-pink">
@@ -440,7 +487,8 @@ export default function GameLobby() {
                         disabled={room.status !== 'waiting'}
                         onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
-                          navigate(`/game/room/${room.roomCode}`);
+                          const scriptId = getScriptIdByTitle(room.scriptTitle);
+                          navigate(`/game/room/${room.roomCode}?scriptId=${scriptId}`);
                         }}
                       >
                         {room.status === 'waiting' ? '加入' : '已开始'}
@@ -471,7 +519,7 @@ export default function GameLobby() {
             <Button
               size="sm"
               icon={<Plus className="w-3.5 h-3.5" />}
-              onClick={() => navigate('/game/lobby')}
+              onClick={() => setShowCreateModal(true)}
             >
               创建房间
             </Button>
@@ -543,7 +591,10 @@ export default function GameLobby() {
                 >
                   <div
                     className="flex items-center justify-between bg-bg-secondary/40 hover:bg-bg-secondary/80 border border-white/5 hover:border-white/10 rounded-xl px-5 py-4 transition-all cursor-pointer group"
-                    onClick={() => navigate(`/game/room/${room.roomCode}`)}
+                    onClick={() => {
+                      const scriptId = getScriptIdByTitle(room.scriptTitle);
+                      navigate(`/game/room/${room.roomCode}?scriptId=${scriptId}`);
+                    }}
                   >
                     <div className="flex items-center gap-4 min-w-0">
                       {/* Room code badge */}
@@ -583,7 +634,8 @@ export default function GameLobby() {
                         disabled={room.status !== 'waiting'}
                         onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
-                          navigate(`/game/room/${room.roomCode}`);
+                          const scriptId = getScriptIdByTitle(room.scriptTitle);
+                          navigate(`/game/room/${room.roomCode}?scriptId=${scriptId}`);
                         }}
                         icon={room.status === 'waiting' ? <Play className="w-3 h-3" /> : undefined}
                       >
@@ -871,6 +923,95 @@ export default function GameLobby() {
           )}
         </motion.section>
       </div>
+
+      {/* ========================================================== */}
+      {/*  创建房间 Modal                                            */}
+      {/* ========================================================== */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            className="w-full max-w-md rounded-2xl bg-bg-secondary border border-white/10 shadow-2xl overflow-hidden"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+              <h3 className="text-lg font-bold text-text-primary">创建游戏房间</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              {/* 选择剧本 */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  选择剧本
+                </label>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    { id: 1, title: '迷雾古堡', genre: '悬疑', desc: '一座被迷雾笼罩的古堡，隐藏着跨越三百年的诅咒与秘密...' },
+                    { id: 2, title: '末日生存', genre: '科幻', desc: '病毒爆发后的第三年，六位幸存者在地下避难所中相遇...' },
+                    { id: 3, title: '赛博迷局', genre: '赛博朋克', desc: '2077年新东京，六位来自不同阶层的人在虚拟与现实交织的世界中相遇...' },
+                  ].map((script) => (
+                    <button
+                      key={script.id}
+                      onClick={() => setCreateScriptId(script.id)}
+                      className={`text-left p-3 rounded-xl border transition-all ${
+                        createScriptId === script.id
+                          ? 'border-neon-purple bg-neon-purple/10'
+                          : 'border-white/5 bg-bg-tertiary/50 hover:border-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-text-primary">{script.title}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-text-muted">
+                          {script.genre}
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-muted line-clamp-2">{script.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 人数设置 */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  最大玩家数: <span className="text-neon-purple font-bold">{createMaxPlayers}</span> 人
+                </label>
+                <input
+                  type="range"
+                  min={3}
+                  max={10}
+                  value={createMaxPlayers}
+                  onChange={(e) => setCreateMaxPlayers(Number(e.target.value))}
+                  className="w-full h-2 bg-bg-tertiary rounded-full appearance-none cursor-pointer accent-neon-purple"
+                />
+                <div className="flex justify-between text-[10px] text-text-muted mt-1">
+                  <span>3人</span>
+                  <span>10人</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/5">
+              <Button variant="ghost" size="sm" onClick={() => setShowCreateModal(false)}>
+                取消
+              </Button>
+              <Button size="sm" onClick={handleCreateRoom} loading={creating}>
+                <Plus className="w-4 h-4 mr-1.5" />
+                创建房间
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

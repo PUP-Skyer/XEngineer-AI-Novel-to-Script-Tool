@@ -315,5 +315,11 @@ export function getAllScripts(): GameScript[] {
   return Object.values(GAME_SCRIPTS);
 }
 
+// 根据剧本标题获取剧本ID
+export function getScriptIdByTitle(title: string): number {
+  const entry = Object.entries(GAME_SCRIPTS).find(([, s]) => s.title === title);
+  return entry ? parseInt(entry[0], 10) : 1;
+}
+
 // 默认导出
 export default GAME_SCRIPTS;
