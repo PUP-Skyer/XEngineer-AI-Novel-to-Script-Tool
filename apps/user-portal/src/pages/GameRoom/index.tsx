@@ -45,6 +45,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import apiClient from '@/services/apiClient';
 import { gameService } from '@/services/gameService';
 import { useGameStore } from '@/stores/gameStore';
+import { getScriptById, getScriptByTitle } from '@/data/gameScripts';
 
 /* ------------------------------------------------------------------ */
 /*  类型定义                                                            */
@@ -768,26 +769,35 @@ export default function GameRoom() {
           setGamePhase('lobby');
         }
 
-        const scriptId = roomData.scriptId;
+        // 使用新的多剧本数据系统
+        const scriptId = roomData.scriptId || 1;
+        const scriptTitle = roomData.scriptName || roomData.title || '';
+        
+        // 优先从本地剧本库加载
+        const localScript = scriptId 
+          ? getScriptById(scriptId) 
+          : getScriptByTitle(scriptTitle);
+        
         try {
           const charRes = await apiClient.get(`/game/novels/${scriptId}/characters`);
-          setCharacters(charRes.data?.data ?? MOCK_CHARACTERS);
+          setCharacters(charRes.data?.data ?? localScript.characters);
         } catch {
-          setCharacters(MOCK_CHARACTERS);
+          setCharacters(localScript.characters);
         }
 
-        const scriptTitle = roomData.scriptName || roomData.title || '';
         try {
           const manualRes = await apiClient.get(`/game/dm/script/${scriptId}`, { params: { title: scriptTitle } });
-          setScriptManual(manualRes.data?.data ?? MOCK_MANUAL);
+          setScriptManual(manualRes.data?.data ?? localScript.manual);
         } catch {
-          setScriptManual(MOCK_MANUAL);
+          setScriptManual(localScript.manual);
         }
       } catch (err: any) {
         setError(err?.response?.data?.message || err?.message || '加载房间失败');
         setRoom({ ...MOCK_ROOM, code: code ?? '' });
-        setCharacters(MOCK_CHARACTERS);
-        setScriptManual(MOCK_MANUAL);
+        // 根据URL参数或默认加载对应剧本
+        const defaultScript = getScriptById(1);
+        setCharacters(defaultScript.characters);
+        setScriptManual(defaultScript.manual);
       } finally {
         setLoading(false);
       }
