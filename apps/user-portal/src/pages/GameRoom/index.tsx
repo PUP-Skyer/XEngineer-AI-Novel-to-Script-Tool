@@ -1614,6 +1614,27 @@ function CharacterPhase({
             <p className="text-sm">暂无可用角色数据</p>
           </div>
         )}
+
+        {/* 移动端底部浮动按钮：选完角色后显示 */}
+        {!isJoined && selectedCharacter && (
+          <div className="lg:hidden fixed bottom-4 left-4 right-4 z-50">
+            <div className="rounded-xl bg-bg-secondary/95 backdrop-blur-md border border-white/10 p-4 shadow-lg shadow-black/40">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-neon-purple to-neon-blue flex items-center justify-center text-sm font-bold text-white shrink-0">
+                  {selectedCharacter.name[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">{selectedCharacter.name}</p>
+                  <p className="text-xs text-text-muted">{selectedCharacter.voicePreset} · 已就绪</p>
+                </div>
+              </div>
+              <Button fullWidth size="md" onClick={onJoin} loading={joining} className="animate-pulse">
+                <Play className="w-4 h-4 mr-2" />
+                选择角色并进入游戏
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 右侧：玩家列表 + 加入按钮 */}
@@ -1647,8 +1668,9 @@ function CharacterPhase({
                     <p className="text-[10px] text-text-muted">{selectedCharacter.voicePreset}</p>
                   </div>
                 </div>
-                <Button fullWidth size="md" onClick={onJoin} loading={joining}>
-                  选择角色并加入
+                <Button fullWidth size="md" onClick={onJoin} loading={joining} className="animate-pulse">
+                  <Play className="w-4 h-4 mr-2" />
+                  选择角色并进入游戏
                 </Button>
               </div>
             ) : (
