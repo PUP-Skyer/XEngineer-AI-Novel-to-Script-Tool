@@ -161,3 +161,7 @@ pnpm dev:all
 ## 📄 License
 
 MIT
+
+## 🎬 项目演示视频 
+
+![项目演示视频](videos/AI小说转文字.mp4) 
