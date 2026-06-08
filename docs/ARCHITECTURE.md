@@ -7,6 +7,7 @@
 ## 一、系统整体架构图
 
 ![系统整体架构图](assets/system-architecture.png)
+<img width="972" height="840" alt="image" src="https://github.com/user-attachments/assets/0a1fc9f7-9ab1-4268-840c-29db9a17ddeb" />
 
 *5层架构：用户层 → 网关层 → 业务服务层 → 基础设施层 → AI 模型层*
 
