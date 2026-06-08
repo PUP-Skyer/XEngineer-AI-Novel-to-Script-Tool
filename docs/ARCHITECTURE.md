@@ -6,26 +6,23 @@
 
 ## 一、系统整体架构图
 
-![系统整体架构图](assets/system-architecture.png)
 <img width="972" height="840" alt="image" src="https://github.com/user-attachments/assets/0a1fc9f7-9ab1-4268-840c-29db9a17ddeb" />
 
-*5层架构：用户层 → 网关层 → 业务服务层 → 基础设施层 → AI 模型层*
+**用户前端架构图**
+<img width="927" height="777" alt="image" src="https://github.com/user-attachments/assets/abdef309-142d-42e0-bcbf-47c2a538a055" />
 
 ---
 
-## 二、游戏状态机流程图
+## 二、核心业务逻辑流程图
 
-![游戏状态机](assets/game-state-machine.png)
-
-*8阶段：LOBBY → INTRO → READING → DISCUSSION → ACCUSATION → VOTING → REVEAL → ENDED → REVIEW*
+<img width="965" height="849" alt="image" src="https://github.com/user-attachments/assets/6ab5bf3b-95ce-4a76-b2b2-9af80ed3b0e6" />
 
 ---
 
-## 三、剧本转换引擎流程图
+## 三、AI模型服务图
 
-![剧本转换引擎](assets/script-conversion-flow.png)
+<img width="936" height="648" alt="image" src="https://github.com/user-attachments/assets/0196361b-b6f9-410d-88af-8bfd028865fb" />
 
-*4阶段转换：分析结构 → 提取角色 → 生成框架 → 润色校验*
 
 ---
 
