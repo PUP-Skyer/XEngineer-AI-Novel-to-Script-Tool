@@ -164,4 +164,5 @@ MIT
 
 ## 🎬 项目演示视频 
 
-![项目演示视频](videos/AI小说转文字.mp4) 
+![项目演示视频](videos/AI小说转文字.mp4) 【AI小说转文字】https://www.bilibili.com/video/BV1nREM6VEms?vd_source=a087475a2dea025a32574e2a4aad3e67
+补充版（补充版.mp4)
